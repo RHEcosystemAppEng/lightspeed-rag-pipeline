@@ -1,0 +1,8 @@
+FROM registry.access.redhat.com/ubi9/python-39
+RUN cd /home
+RUN mkdir rag 
+COPY . /home/rag/
+RUN mkdir -p lightspeed/data 
+WORKDIR /home/rag
+
+RUN pip install -r requirements.txt

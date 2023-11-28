@@ -1,0 +1,8 @@
+chromadb==0.4.4
+llama_index
+transformers
+torch
+llama_index
+pysqlite3-binary 
+llama-cpp-python 
+

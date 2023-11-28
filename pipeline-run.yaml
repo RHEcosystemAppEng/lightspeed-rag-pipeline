@@ -1,0 +1,35 @@
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  annotations:
+    pipeline.openshift.io/started-by: ilpinto@redhat.com
+
+  labels:
+    tekton.dev/pipeline: rag-data-pipeline
+  name: rag-data-pipeline-1
+  namespace: lightspeed
+spec:
+  params:
+  - name: repo
+    value: git@github.com:ilan-pinto/lightspeed-rag-documents.git
+  - name: branch-name
+    value: main
+  - name: plain-text-folder
+    value: /workspace/source/ocp-product-docs-plaintext
+  pipelineRef:
+    name: rag-data-pipeline
+  taskRunTemplate:
+    serviceAccountName: pipeline
+    podTemplate:
+      computeResources:
+          limits:
+            nvidia.com/gpu: '1'
+          requests:
+            nvidia.com/gpu: '1'
+
+  timeouts:
+    pipeline: 1h0m0s
+  workspaces:
+  - name: shared-workspace
+    persistentVolumeClaim:
+      claimName: pvc-5cc8b42895

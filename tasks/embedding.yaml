@@ -1,0 +1,88 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: embedding
+
+spec:
+  description: >-
+    These task emmbedes the folder files into a vector db 
+
+  workspaces:
+    - name: source
+      description: shared Workspace containing the data to embed
+    - name: output
+      description: persisting data output 
+ 
+
+  params:
+
+    - name: plain-text-folder
+      type: string
+      description: plain text folder path
+
+    - name: vector-db
+      type: string
+      description: type of vector db[local,chromadb,chromadb-local, milvus]
+      default: local
+
+    - name: vector-host
+      type: string
+      description: vector db url  
+      default: "."
+
+    - name: vector-port
+      type: string
+      description: vector db port  
+      default: "."
+
+    - name: vector-header
+      type: string
+      default: "."
+      description: authentication headers per vectorDB requirements 
+
+    - name: model-name
+      type: string
+      description: LLM model used for emmbadning [local,llama2, or any other supported by llama_index]
+      default: local
+
+    - name: collection-name
+      type: string
+      description: collection name in vector DB
+
+    - name: output-folder
+      type: string
+      description: collection name in vector DB
+
+  results:
+    - name: status
+      description: task status 
+  steps:
+    - name: embedde
+      image: "quay.io/ilan_pinto/rag-embedding"
+      env:
+      - name: VECTOR_DB_TYPE
+        value: "$(params.vector-db)"
+      - name: HOST
+        value: "$(params.vector-host)"
+      - name: PORT
+        value: $(params.vector-port)
+      - name: HEADERS
+        value: $(params.vector-header)
+      - name: MODEL_NAME
+        value: $(params.model-name)
+      - name: FOLDER
+        value: $(params.plain-text-folder)
+      - name: COLLECTION_NAME
+        value: $(params.collection-name)
+      - name: WORKSPACE_OUTPUT_PATH
+        value: $(workspaces.output.path)/data/$(params.output-folder)
+
+      script: |
+        #!/usr/bin/env sh
+        set -eu
+
+        python embedding.py --vector-type ${VECTOR_DB_TYPE} --url ${HOST} --port ${PORT} --auth ${HEADERS} --model ${MODEL_NAME} --folder ${FOLDER} --collection-name ${COLLECTION_NAME} -o ${WORKSPACE_OUTPUT_PATH}
+
+        cd $(workspaces.output.path)/data && zip -r $(params.output-folder).zip $(params.output-folder)
+
+
