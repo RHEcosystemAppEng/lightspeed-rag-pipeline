@@ -49,6 +49,15 @@ spec:
       type: string
       description: collection name in vector DB
 
+    - name: include-evaluation
+      type: string
+      description: perform evaluation  
+      default: "True"
+
+    - name: question-folder
+      type: string
+      description: plain text folder path used for question gen
+
     - name: output-folder
       type: string
       description: collection name in vector DB
@@ -76,12 +85,23 @@ spec:
         value: $(params.collection-name)
       - name: WORKSPACE_OUTPUT_PATH
         value: $(workspaces.output.path)/data/$(params.output-folder)
-
+      - name: INCLUDE_EVALUATION
+        value: $(params.include-evaluation)
+      - name: QUESTION_FOLDER
+        value: $(params.question-folder)
       script: |
         #!/usr/bin/env sh
         set -eu
 
-        python embedding.py --vector-type ${VECTOR_DB_TYPE} --url ${HOST} --port ${PORT} --auth ${HEADERS} --model ${MODEL_NAME} --folder ${FOLDER} --collection-name ${COLLECTION_NAME} -o ${WORKSPACE_OUTPUT_PATH}
+        python embedding.py --vector-type ${VECTOR_DB_TYPE} \
+                            --url ${HOST} --port ${PORT} \
+                            --auth ${HEADERS} \
+                            --model ${MODEL_NAME} \
+                            --folder ${FOLDER} \
+                            --collection-name ${COLLECTION_NAME} \
+                            -o ${WORKSPACE_OUTPUT_PATH} \ 
+                            --include-evaluating ${INCLUDE_EVALUATION} \
+                            --question-folder ${QUESTION_FOLDER} \
 
         cd $(workspaces.output.path)/data && zip -r $(params.output-folder).zip $(params.output-folder)
 

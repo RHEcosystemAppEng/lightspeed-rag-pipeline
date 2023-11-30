@@ -2,15 +2,23 @@ __import__('pysqlite3')
 
 import json
 import sys
-import os 
+import os
+import time 
 sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 
 from llama_index import VectorStoreIndex, SimpleDirectoryReader, ServiceContext
 from llama_index.vector_stores import ChromaVectorStore
 from llama_index.storage.storage_context import StorageContext
-from llama_index.embeddings import HuggingFaceEmbedding
-import argparse
+from llama_index.evaluation import (
+    FaithfulnessEvaluator,
+    RelevancyEvaluator,
+    CorrectnessEvaluator,
+    BatchEvalRunner,
+    DatasetGenerator,
+    RelevancyEvaluator
+)
 
+import argparse
 import chromadb
 
 def load_docs(folder): 
@@ -24,9 +32,21 @@ def load_docs(folder):
     print(f"** Found {len(file_paths)} files ")
     return file_paths   
 
+def get_eval_results(key, eval_results):
+    results = eval_results[key]
+    correct = 0
+    for result in results:
+        if result.passing:
+            correct += 1
+    score = correct / len(results)
+    print(f"{key} Score: {score}")
+    return score
+
 
 # python embedding.py --vector-type chromadb --url 'chroma-lightspeed.apps.cn-ai-lab.6aw6.p1.openshiftapps.com'  --port '80' --auth '{"Authorization": "GSe8ipXPZNp4gcVfHixWahi1najVNT6T"}' --model 'local' --folder './dummy' --collection-name ocp
-def main(): 
+async def main(): 
+    
+    start_time = time.time()
     # collect args 
     parser = argparse.ArgumentParser(
         description="embedding cli for task execution"
@@ -37,7 +57,10 @@ def main():
     parser.add_argument("-a", "--auth", help="Authentication headers per vectorDB requirements")    
     parser.add_argument("-n", "--collection-name", help="Collection name in vector DB")
     parser.add_argument("-f", "--folder", help="Plain text folder path")
-    parser.add_argument("-m", "--model",   default="local", help="LLM model used for embeddings [local,llama2, or any other supported by llama_index]")
+    parser.add_argument("-m", "--model",   default="local:BAAI/bge-base-en", help="LLM model used for embeddings [local,llama2, or any other supported by llama_index]")
+    parser.add_argument("-e", "--include-evaluation",   default="True", help="preform evaluation [True/False]")
+    parser.add_argument("-q", "--question-folder",   default="", help="docs folder for questions gen")
+
     parser.add_argument("-o", "--output", help="persist folder")
 
 
@@ -89,13 +112,68 @@ def main():
     print("** Loading docs ")
 
     index = VectorStoreIndex.from_documents(
-        documents, storage_context=storage_context, service_context=service_context, show_progress= True
+        documents, storage_context=storage_context, service_context=service_context, show_progress=True
     )
     
     index.storage_context.persist(persist_dir=PERSIST_FOLDER)
-
     print("*** Completed  embeddings ")
+    
+    if args.include_evaluation == "True": 
+        # starting evaluation
+        print("** starting model evaluating")
+        
+        print("*** generating questions ")        
+        question_folder = args.folder if args.question_folder is None else args.question_folder
+        
+        reader = SimpleDirectoryReader(question_folder)
+        documents = reader.load_data()
+        data_generator = DatasetGenerator.from_documents(documents)
+        eval_questions = data_generator.generate_questions_from_nodes(num=25)
+        engine = index.as_query_engine(similarity_top_k=1, service_context=service_context)
+    
+        print("*** start evaluation")
+        faithfulness = FaithfulnessEvaluator(service_context=service_context)
+        relevancy = RelevancyEvaluator(service_context=service_context)
+        correctness = CorrectnessEvaluator(service_context=service_context)
 
+        runner = BatchEvalRunner(
+            {"faithfulness": faithfulness, "relevancy": relevancy , "correctness": correctness},
+            workers=10, show_progress=True
+        )
+        
+        eval_results = await runner.aevaluate_queries( index.as_query_engine(similarity_top_k=2, \
+                                                                            service_context=service_context), \
+                                                                            queries=eval_questions ) 
+        
+        evaluation_results = {}
+        evaluation_results["faithfulness"] = get_eval_results("faithfulness", eval_results)
+        evaluation_results["relevancy"] = get_eval_results("relevancy", eval_results)
+        evaluation_results["correctness"] = get_eval_results("correctness", eval_results)
+
+    end_time = time.time()
+    execution_time_seconds = end_time - start_time
+    
+    print(f"** Total execution time in seconds: {execution_time_seconds}")
+    
+    # creating metadata folder 
+    metadata = {} 
+    
+    metadata["execution-time"] = execution_time_seconds
+    metadata["llm"] = 'local'
+    metadata["embedding-model"] = args.model
+    metadata["vector-db"] = args.vector_type
+    metadata["total-embedded-files"] = len(documents)
+    metadata["eval_questions"] = eval_questions
+    metadata["evaluation_results"] = evaluation_results
+    
+    json_metadata = json.dumps(metadata)
+
+    # Write the JSON data to a file
+    file_path = f"{PERSIST_FOLDER}/metadata.json"
+    with open(file_path, 'w') as file:
+        file.write(json_metadata)
+
+    
 main()
 
 

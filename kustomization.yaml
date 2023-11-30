@@ -6,14 +6,10 @@ resources:
 - secrets/git-ssh-secret.yaml 
 - secrets/secret-git.yaml 
 - secrets/secret-quay.yaml
-- secrets/default_service_account.yaml
+- secrets/pipeline-service-account.yaml
 - secrets/github-token.yaml
 - secrets/server-secret.yaml
-
-#roles 
-# - roles/clusterrole.yaml
-# - roles/clusterrolebinding.yaml
-# - roles/account-ClusterRoleBinding.yaml
+- secrets/secret-openai.yaml
 
 # apply task 
 - tasks/embedding.yaml 
@@ -24,4 +20,3 @@ resources:
 
 # pipeline 
 - pipeline/data-pipeline.yaml
-#triggers 

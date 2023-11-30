@@ -16,10 +16,15 @@ spec:
         type: string
         description: Plain text folder path
         default: /workspace/source/ocp-product-docs-plaintext
+      - name: question-folder
+        type: string
+        description: Plain text question-folder path
+        default: /workspace/source/ocp-product-docs-plaintext//applications/deployments
 
       - name: tag
         type: string
         description: rag results base tag
+        default: "0.0.4"
 
       workspaces:     
         - name: shared-workspace  
@@ -67,6 +72,9 @@ spec:
             - name: output-folder
               value: local
 
+            - name: question-folder
+              value: "$(params.question-folder)"
+
       - name: chroma-local
         taskRef:
           name: embedding
@@ -92,6 +100,9 @@ spec:
 
             - name: output-folder
               value: chorma-local
+
+            - name: question-folder
+              value: "$(params.question-folder)"
 
       - name: chroma-remote
         taskRef:
@@ -128,7 +139,8 @@ spec:
             - name: output-folder
               value: chorma-remote 
 
-
+            - name: question-folder
+              value: "$(params.question-folder)"
 
       - name: create-github-release
         taskRef:
