@@ -20,6 +20,9 @@ from llama_index.evaluation import (
 
 import argparse
 import chromadb
+import asyncio
+import nest_asyncio
+
 
 def load_docs(folder): 
     # get files 
@@ -43,7 +46,13 @@ def get_eval_results(key, eval_results):
     return score
 
 
-# python embedding.py --vector-type chromadb --url 'chroma-lightspeed.apps.cn-ai-lab.6aw6.p1.openshiftapps.com'  --port '80' --auth '{"Authorization": "GSe8ipXPZNp4gcVfHixWahi1najVNT6T"}' --model 'local' --folder './dummy' --collection-name ocp
+#         python embedding.py --vector-type ${VECTOR_DB_TYPE} \
+                            # --url ${HOST} --port ${PORT} \
+                            # --auth ${HEADERS} \
+                            # --model ${MODEL_NAME} \
+                            # --folder ${FOLDER} \
+                            # --collection-name ${COLLECTION_NAME} -o ${WORKSPACE_OUTPUT_PATH} -e ${INCLUDE_EVALUATION} --question-folder ${QUESTION_FOLDER}
+
 async def main(): 
     
     start_time = time.time()
@@ -121,34 +130,37 @@ async def main():
     if args.include_evaluation == "True": 
         # starting evaluation
         print("** starting model evaluating")
+        nest_asyncio.apply()
         
         print("*** generating questions ")        
         question_folder = args.folder if args.question_folder is None else args.question_folder
         
         reader = SimpleDirectoryReader(question_folder)
-        documents = reader.load_data()
-        data_generator = DatasetGenerator.from_documents(documents)
-        eval_questions = data_generator.generate_questions_from_nodes(num=25)
-        engine = index.as_query_engine(similarity_top_k=1, service_context=service_context)
-    
+        question = reader.load_data()
+        data_generator = DatasetGenerator.from_documents(question)
+        eval_questions = data_generator.generate_questions_from_nodes(num=5)
+        # engine = index.as_query_engine(similarity_top_k=1, service_context=service_context)
+        
+        print( eval_questions)
+        
         print("*** start evaluation")
         faithfulness = FaithfulnessEvaluator(service_context=service_context)
         relevancy = RelevancyEvaluator(service_context=service_context)
         correctness = CorrectnessEvaluator(service_context=service_context)
 
         runner = BatchEvalRunner(
-            {"faithfulness": faithfulness, "relevancy": relevancy , "correctness": correctness},
+            {"faithfulness": faithfulness, "relevancy": relevancy },
             workers=10, show_progress=True
         )
         
-        eval_results = await runner.aevaluate_queries( index.as_query_engine(similarity_top_k=2, \
+        eval_results = await runner.aevaluate_queries( index.as_query_engine(similarity_top_k=1, \
                                                                             service_context=service_context), \
                                                                             queries=eval_questions ) 
         
         evaluation_results = {}
         evaluation_results["faithfulness"] = get_eval_results("faithfulness", eval_results)
         evaluation_results["relevancy"] = get_eval_results("relevancy", eval_results)
-        evaluation_results["correctness"] = get_eval_results("correctness", eval_results)
+        # evaluation_results["correctness"] = get_eval_results("correctness", eval_results)
 
     end_time = time.time()
     execution_time_seconds = end_time - start_time
@@ -165,15 +177,23 @@ async def main():
     metadata["total-embedded-files"] = len(documents)
     metadata["eval_questions"] = eval_questions
     metadata["evaluation_results"] = evaluation_results
-    
     json_metadata = json.dumps(metadata)
 
     # Write the JSON data to a file
     file_path = f"{PERSIST_FOLDER}/metadata.json"
     with open(file_path, 'w') as file:
         file.write(json_metadata)
-
     
-main()
+    # Convert JSON data to markdown 
+    markdown_content = "```markdown\n"
+    for key, value in metadata.items():
+        markdown_content += f"- {key}: {value}\n"
+    markdown_content += "```" 
+    
+    file_path = f"{PERSIST_FOLDER}/metadata.md"
+    with open(file_path, 'w') as file:
+        file.write(markdown_content)
 
-
+    return "Completed"
+    
+asyncio.run(main())

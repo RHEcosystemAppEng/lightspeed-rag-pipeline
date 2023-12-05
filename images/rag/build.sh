@@ -1,7 +1,11 @@
 #!/bin/bash 
 
-VERSION=1.3
+VERSION= # 13
+IMAGE_REPO= #"quay.io/ilan_pinto"
 
-docker build --pull -f "images/rag/dockerfile" -t rag-embedding "images/rag"
-docker tag  rag-embedding quay.io/ilan_pinto/rag-embedding
-docker push quay.io/ilan_pinto/rag-embedding
+
+docker build --pull -f "images/rag/dockerfile" -t rag-embedding:${VERSION} "images/rag"
+docker tag  rag-embedding:${VERSION} ${IMAGE_REPO}/rag-embedding:${VERSION}
+docker push ${IMAGE_REPO}/rag-embedding:${VERSION}
+
+# NOTE: After building image. make sure to update image name `tasks/embedding.yaml` line 66  

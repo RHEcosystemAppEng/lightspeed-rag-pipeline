@@ -7,16 +7,27 @@ resources:
 - secrets/secret-git.yaml 
 - secrets/secret-quay.yaml
 - secrets/pipeline-service-account.yaml
+- secrets/default-service-account.yaml
 - secrets/github-token.yaml
 - secrets/server-secret.yaml
 - secrets/secret-openai.yaml
 
+# scc 
+- scc/secuirty-context.yaml
+
 # apply task 
-- tasks/embedding.yaml 
+- tasks/embedding.yaml
+- tasks/create-docker-file.yaml 
 - tasks/git-clone.yaml
 - tasks/sendmail.yaml
 - tasks/create-github-release.yaml
 - tasks/generate-build-id.yaml
+- tasks/buildah.yaml
+
+# config
+- config/pipeline-config.yaml
 
 # pipeline 
 - pipeline/data-pipeline.yaml
+- pipeline/data-pipeline-test.yaml
+

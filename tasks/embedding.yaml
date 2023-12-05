@@ -2,7 +2,6 @@ apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
   name: embedding
-
 spec:
   description: >-
     These task emmbedes the folder files into a vector db 
@@ -12,10 +11,7 @@ spec:
       description: shared Workspace containing the data to embed
     - name: output
       description: persisting data output 
- 
-
   params:
-
     - name: plain-text-folder
       type: string
       description: plain text folder path
@@ -56,7 +52,7 @@ spec:
 
     - name: question-folder
       type: string
-      description: plain text folder path used for question gen
+      description: plain text folder path used for question 
 
     - name: output-folder
       type: string
@@ -66,8 +62,11 @@ spec:
     - name: status
       description: task status 
   steps:
-    - name: embedde
-      image: "quay.io/ilan_pinto/rag-embedding"
+    - name: embedded
+      image: "quay.io/ilan_pinto/rag-embedding:13"
+      envFrom:
+          - secretRef:
+              name: secret-openai
       env:
       - name: VECTOR_DB_TYPE
         value: "$(params.vector-db)"
@@ -89,6 +88,8 @@ spec:
         value: $(params.include-evaluation)
       - name: QUESTION_FOLDER
         value: $(params.question-folder)
+      - name: TOKENIZERS_PARALLELISM
+        value: "false"
       script: |
         #!/usr/bin/env sh
         set -eu
@@ -98,11 +99,8 @@ spec:
                             --auth ${HEADERS} \
                             --model ${MODEL_NAME} \
                             --folder ${FOLDER} \
-                            --collection-name ${COLLECTION_NAME} \
-                            -o ${WORKSPACE_OUTPUT_PATH} \ 
-                            --include-evaluating ${INCLUDE_EVALUATION} \
-                            --question-folder ${QUESTION_FOLDER} \
+                            --collection-name ${COLLECTION_NAME} -o ${WORKSPACE_OUTPUT_PATH} -e ${INCLUDE_EVALUATION} --question-folder ${QUESTION_FOLDER}
 
+        mv ${WORKSPACE_OUTPUT_PATH}/metadata.md $(workspaces.output.path)
         cd $(workspaces.output.path)/data && zip -r $(params.output-folder).zip $(params.output-folder)
-
 

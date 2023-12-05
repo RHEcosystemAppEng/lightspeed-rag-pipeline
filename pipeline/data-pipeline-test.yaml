@@ -1,0 +1,90 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: rag-data-pipeline-test
+spec:
+      params:
+      - name: repo
+        type: string
+        default: git@github.com:ilan-pinto/lightspeed-rag-documents.git
+        description: Plain text source repo git 
+      - name: branch-name
+        type: string
+        description: The git branch to clone.
+        default: main
+      - name: plain-text-folder
+        type: string
+        description: Plain text folder path
+        default: /workspace/source/ocp-product-docs-plaintext
+      - name: question-folder
+        type: string
+        description: Plain text question-folder path
+        default: /workspace/source/ocp-product-docs-plaintext/applications/deployments
+
+      - name: tag
+        type: string
+        description: rag results base tag
+        default: "0.0.4"
+
+      workspaces:     
+        - name: shared-workspace  
+
+      tasks:
+      - name: git-clone
+        taskRef:
+          name: git-clone
+        workspaces:
+            - name: source
+              workspace: shared-workspace 
+        params:
+          - name: url
+            value:  "$(params.repo)"    #git@gitlab.cee.redhat.com:ilpinto/rover-bot.git
+          - name: revision 
+            value: "$(params.branch-name)"  
+          - name: subdirectory
+            value: ""
+          - name: deleteExisting
+            value: "true"
+
+      - name: create-docker-file
+        taskRef:
+          name: create-docker-file
+        runAfter:
+          - git-clone
+        workspaces:
+          - name: output
+            workspace: shared-workspace 
+
+      - name: push-to-quay
+        taskRef:
+          name: buildah
+        runAfter:
+          - create-docker-file
+        workspaces:
+          - name: output
+            workspace: shared-workspace  
+
+        params:
+            - name: IMAGE
+              value: quay.io/redhat_emp1/lightspeed-rag
+            - name: DOCKERFILE
+              value: dockerfile.output
+
+      - name: create-github-release
+        taskRef:
+          name: create-github-release
+        runAfter:
+            -  create-docker-file
+        workspaces:
+          - name: source
+            workspace: shared-workspace  
+          - name: release-notes
+            workspace: shared-workspace 
+          - name: output
+            workspace: shared-workspace 
+        params:
+            - name: TAG
+              value: $(params.tag)
+            - name: REVISION
+              value: "main"
+ 
