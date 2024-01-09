@@ -3,7 +3,8 @@ __import__('pysqlite3')
 import json
 import sys
 import os
-import time 
+import time
+from backoff import constant 
 sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 
 from llama_index import VectorStoreIndex, SimpleDirectoryReader, ServiceContext
@@ -22,6 +23,9 @@ import argparse
 import chromadb
 import asyncio
 import nest_asyncio
+
+# Constant
+PRODUCT_INDEX = "product"
 
 
 def load_docs(folder): 
@@ -81,7 +85,7 @@ async def main():
     # setup storage context 
     if args.vector_type == "local": 
         print("** Local embeddings ") 
-        storage_context = StorageContext.from_defaults( )
+        storage_context = StorageContext.from_defaults()
         
     elif args.vector_type == "chromadb":
         print("** chromadb embeddings ")
@@ -123,7 +127,7 @@ async def main():
     index = VectorStoreIndex.from_documents(
         documents, storage_context=storage_context, service_context=service_context, show_progress=True
     )
-    
+    index.set_index_id(PRODUCT_INDEX)
     index.storage_context.persist(persist_dir=PERSIST_FOLDER)
     print("*** Completed  embeddings ")
     
@@ -149,7 +153,7 @@ async def main():
         correctness = CorrectnessEvaluator(service_context=service_context)
 
         runner = BatchEvalRunner(
-            {"faithfulness": faithfulness, "relevancy": relevancy },
+            {"faithfulness": faithfulness, "relevancy": relevancy , "correctness": correctness },
             workers=10, show_progress=True
         )
         
@@ -160,7 +164,7 @@ async def main():
         evaluation_results = {}
         evaluation_results["faithfulness"] = get_eval_results("faithfulness", eval_results)
         evaluation_results["relevancy"] = get_eval_results("relevancy", eval_results)
-        # evaluation_results["correctness"] = get_eval_results("correctness", eval_results)
+        evaluation_results["correctness"] = get_eval_results("correctness", eval_results)
 
     end_time = time.time()
     execution_time_seconds = end_time - start_time
@@ -172,7 +176,9 @@ async def main():
     
     metadata["execution-time"] = execution_time_seconds
     metadata["llm"] = 'local'
-    metadata["embedding-model"] = args.model
+    metadata["embedding-model"] = args.model 
+    metadata["index_id"] = PRODUCT_INDEX
+
     metadata["vector-db"] = args.vector_type
     metadata["total-embedded-files"] = len(documents)
     metadata["eval_questions"] = eval_questions
@@ -193,6 +199,7 @@ async def main():
     file_path = f"{PERSIST_FOLDER}/metadata.md"
     with open(file_path, 'w') as file:
         file.write(markdown_content)
+
 
     return "Completed"
     

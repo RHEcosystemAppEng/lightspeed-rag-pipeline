@@ -1,7 +1,7 @@
 #!/bin/bash 
 
-VERSION= # 13
-IMAGE_REPO= #"quay.io/ilan_pinto"
+VERSION=14 # 13
+IMAGE_REPO="quay.io/ilan_pinto"
 
 
 docker build --pull -f "images/rag/dockerfile" -t rag-embedding:${VERSION} "images/rag"
