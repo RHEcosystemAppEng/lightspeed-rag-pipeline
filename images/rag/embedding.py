@@ -27,7 +27,6 @@ import nest_asyncio
 # Constant
 PRODUCT_INDEX = "product"
 
-
 def load_docs(folder): 
     # get files 
     file_paths = []
@@ -135,7 +134,6 @@ async def main():
     index.set_index_id(PRODUCT_INDEX)
     index.storage_context.persist(persist_dir=PERSIST_FOLDER)
     print("*** Completed  embeddings ")
-    
 
     end_time = time.time()
     execution_time_seconds = end_time - start_time
