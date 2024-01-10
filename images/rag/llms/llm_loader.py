@@ -7,7 +7,7 @@ from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 
 from utils.logger import Logger
 from utils import config
-import src.constants as constants
+import utils.constants as constants
 
 # workaround to disable UserWarning
 warnings.simplefilter("ignore", UserWarning)
@@ -50,6 +50,8 @@ class LLMLoader:
         # return empty dictionary if not defined
         self.llm_params = params if params else {}
         self.llm = None
+        config.load_config_from_env()
+
         self._set_llm_instance()
 
     def _set_llm_instance(self):

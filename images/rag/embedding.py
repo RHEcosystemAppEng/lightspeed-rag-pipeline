@@ -118,7 +118,7 @@ async def main():
     
     print("** Configured storage context")
     
-    service_context = ServiceContext.from_defaults(chunk_size=512, chunk_overlap=10,embed_model=args.model, llm='local')
+    service_context = ServiceContext.from_defaults(chunk_size=2000, chunk_overlap=500,embed_model=args.model, llm='local')
     print("** Configured service_context")
     
     documents = SimpleDirectoryReader(input_files=load_docs(args.folder)).load_data()
@@ -131,40 +131,6 @@ async def main():
     index.storage_context.persist(persist_dir=PERSIST_FOLDER)
     print("*** Completed  embeddings ")
     
-    if args.include_evaluation == "True": 
-        # starting evaluation
-        print("** starting model evaluating")
-        nest_asyncio.apply()
-        
-        print("*** generating questions ")        
-        question_folder = args.folder if args.question_folder is None else args.question_folder
-        
-        reader = SimpleDirectoryReader(question_folder)
-        question = reader.load_data()
-        data_generator = DatasetGenerator.from_documents(question)
-        eval_questions = data_generator.generate_questions_from_nodes(num=5)
-        # engine = index.as_query_engine(similarity_top_k=1, service_context=service_context)
-        
-        print( eval_questions)
-        
-        print("*** start evaluation")
-        faithfulness = FaithfulnessEvaluator(service_context=service_context)
-        relevancy = RelevancyEvaluator(service_context=service_context)
-        correctness = CorrectnessEvaluator(service_context=service_context)
-
-        runner = BatchEvalRunner(
-            {"faithfulness": faithfulness, "relevancy": relevancy , "correctness": correctness },
-            workers=10, show_progress=True
-        )
-        
-        eval_results = await runner.aevaluate_queries( index.as_query_engine(similarity_top_k=1, \
-                                                                            service_context=service_context), \
-                                                                            queries=eval_questions ) 
-        
-        evaluation_results = {}
-        evaluation_results["faithfulness"] = get_eval_results("faithfulness", eval_results)
-        evaluation_results["relevancy"] = get_eval_results("relevancy", eval_results)
-        evaluation_results["correctness"] = get_eval_results("correctness", eval_results)
 
     end_time = time.time()
     execution_time_seconds = end_time - start_time
@@ -181,8 +147,7 @@ async def main():
 
     metadata["vector-db"] = args.vector_type
     metadata["total-embedded-files"] = len(documents)
-    metadata["eval_questions"] = eval_questions
-    metadata["evaluation_results"] = evaluation_results
+
     json_metadata = json.dumps(metadata)
 
     # Write the JSON data to a file

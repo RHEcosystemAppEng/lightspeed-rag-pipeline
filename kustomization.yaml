@@ -11,12 +11,14 @@ resources:
 - secrets/github-token.yaml
 - secrets/server-secret.yaml
 - secrets/secret-openai.yaml
+- secrets/secret-bam.yaml
 
 # scc 
 - scc/secuirty-context.yaml
 
 # apply task 
 - tasks/embedding.yaml
+- tasks/evaluation.yaml
 - tasks/create-docker-file.yaml 
 - tasks/git-clone.yaml
 - tasks/sendmail.yaml

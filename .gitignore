@@ -1,2 +1,5 @@
 /.vscode
-/secrets   
+/secrets
+/output
+.env
+/persist-dir

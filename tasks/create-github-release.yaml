@@ -49,12 +49,21 @@ spec:
         # Appending command to upload multiple release assets.
 
         UPLOAD_ASSET=$(workspaces.output.path)/data/*.zip
+        METADATA_ASSETS=$(workspaces.output.path)/data/*.md
         cmd=""
         for file in $UPLOAD_ASSET
         do
           cmd="$cmd\
             --attach $file"
         done
+        
+        for file in $METADATA_ASSETS
+        do
+          cmd="$cmd\
+            --attach $file"
+        done
+          
+
 
         # Create a release
         echo "Creating release $(params.TAG)"
@@ -66,7 +75,6 @@ spec:
         hub release create \
           --commitish $(params.REVISION) \
           --file $(workspaces.release-notes.path)/$(params.RELEASE_FILE_NAME) \
-          --attach $(workspaces.output.path)/metadata.md \
           $cmd $(params.TAG)-${ts}
 
       env:

@@ -2,7 +2,7 @@ apiVersion: tekton.dev/v1beta1
 kind: Pipeline
 metadata:
   name: rag-data-pipeline-test
-spec:
+spec: 
       params:
       - name: repo
         type: string
@@ -46,11 +46,63 @@ spec:
           - name: deleteExisting
             value: "true"
 
+      - name: local-embedding
+        taskRef:
+          name: embedding
+        runAfter:
+          - git-clone
+        workspaces:
+          - name: source
+            workspace: shared-workspace  
+          - name: output
+            workspace: shared-workspace 
+        params:
+            - name: vector-db
+              value: "local"
+
+            - name: model-name
+              value: local:BAAI/bge-base-en
+
+            - name: plain-text-folder
+              value: "$(params.plain-text-folder)"
+
+            - name: collection-name
+              value: ocp-local
+
+            - name: output-folder
+              value: local
+
+            - name: question-folder
+              value: "$(params.question-folder)"
+      
+      - name: bam-evaluation
+        taskRef:
+          name: evaluation
+        runAfter:
+          - local-embedding
+        workspaces:
+          - name: persist-source
+            workspace: shared-workspace  
+          - name: output
+            workspace: shared-workspace 
+        params:
+            - name: provider
+              value: "bam"
+
+            - name: model
+              value: ibm/granite-13b-chat-v1
+
+            - name: input-persist-dir
+              value: "$(workspaces.output.path)/data"
+
+            - name: question-folder
+              value: "$(params.question-folder)"
+
       - name: create-docker-file
         taskRef:
           name: create-docker-file
         runAfter:
-          - git-clone
+          - bam-evaluation
         workspaces:
           - name: output
             workspace: shared-workspace 
@@ -63,7 +115,6 @@ spec:
         workspaces:
           - name: output
             workspace: shared-workspace  
-
         params:
             - name: IMAGE
               value: quay.io/redhat_emp1/lightspeed-rag
@@ -74,7 +125,7 @@ spec:
         taskRef:
           name: create-github-release
         runAfter:
-            -  create-docker-file
+            - bam-evaluation 
         workspaces:
           - name: source
             workspace: shared-workspace  
@@ -87,4 +138,4 @@ spec:
               value: $(params.tag)
             - name: REVISION
               value: "main"
- 
+
