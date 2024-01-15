@@ -11,6 +11,8 @@ spec:
       description: shared Workspace containing the data to embed
     - name: output
       description: evaluation
+    - name: source
+      description: shared Workspace containing the data to embed
   params:
     - name: provider
       type: string
@@ -47,12 +49,22 @@ spec:
       default: "5"
       description: authentication headers per vectorDB requirements 
 
+    - name: chunk-size
+      type: string
+      default: "1000"
+      description: chunk size for embedding
+
+    - name: chunk-overlap
+      type: string
+      default: "100"
+      description: chunk overlap for embedding
+
   results:
     - name: status
       description: task status 
   steps:
     - name: evaluation
-      image: "quay.io/ecosystem-appeng/rag-evaluation:26" # update image accordingly
+      image: "quay.io/ecosystem-appeng/rag-evaluation:37" # update image accordingly
       envFrom:
           - secretRef:
               name: secret-openai
@@ -66,7 +78,7 @@ spec:
         value: "$(params.model)"
       - name: PRODUCT_INDEX
         value: $(params.product-index)
-      - name: INPUT-PERSIST-DIR
+      - name: INPUT_PERSIST_DIR
         value: $(params.input-persist-dir)
       - name: QUESTION_FOLDER
         value: $(params.question-folder)
@@ -74,11 +86,17 @@ spec:
       - name: SIMILARITY
         value: $(params.similarity)
 
-      - name:  NUMBER-OF-QUESTIONS
+      - name:  NUMBER_OF_QUESTIONS
         value: $(params.number-of-questions)
 
       - name: OUTPUT_PATH
         value: $(workspaces.output.path)/data
+
+      - name: CHUNK_SIZE
+        value: $(params.chunk-size)
+
+      - name: CHUNK_OVERLAP
+        value: $(params.chunk-overlap)
 
       - name: TOKENIZERS_PARALLELISM
         value: "false"
@@ -86,14 +104,17 @@ spec:
         #!/usr/bin/env sh
         set -eu
 
-        python evaluation.py --provider ${PROVIDER} \
-                              --input-persist-dir ${INPUT-PERSIST-DIR} \ 
-                              --pi ${PRODUCT_INDEX} \
-                              --model ${MODEL} \
-                              -o ${OUTPUT_PATH} \
-                              --question-folder ${QUESTION_FOLDER}\
-                              -s ${SIMILARITY} \
-                              -qn ${NUMBER-OF-QUESTIONS}
+        echo "-p ${PROVIDER} \
+              -i ${INPUT_PERSIST_DIR} \ 
+              -x ${PRODUCT_INDEX} \
+              -m ${MODEL} \
+              -o ${OUTPUT_PATH} \
+              -q ${QUESTION_FOLDER}\
+              -s ${SIMILARITY} \
+              -n ${NUMBER_OF_QUESTIONS}
+              "
 
-        mv ${WORKSPACE_OUTPUT_PATH}/*.md $(workspaces.output.path)
+        python evaluation.py -p ${PROVIDER} -i ${INPUT_PERSIST_DIR} -x ${PRODUCT_INDEX} -m ${MODEL} -o ${OUTPUT_PATH} -q ${QUESTION_FOLDER} -s ${SIMILARITY} -n ${NUMBER_OF_QUESTIONS} -c ${CHUNK_SIZE} -l ${CHUNK_OVERLAP}
+
+        mv ${OUTPUT_PATH}/*.md $(workspaces.output.path)
 

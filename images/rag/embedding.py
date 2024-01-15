@@ -74,6 +74,9 @@ async def main():
     parser.add_argument("-e", "--include-evaluation",   default="True", help="preform evaluation [True/False]")
     parser.add_argument("-q", "--question-folder",   default="", help="docs folder for questions gen")
 
+    parser.add_argument("-c", "--chunk",   default="1000", help="chunk size for embedding")
+    parser.add_argument("-l", "--overlap",   default="100", help="chunk overlap for embedding")
+
     parser.add_argument("-o", "--output", help="persist folder")
 
 
@@ -81,6 +84,8 @@ async def main():
     args = parser.parse_args() 
     
     PERSIST_FOLDER = args.output
+    CHUNK_SIZE=int(args.chunk)
+    CHUNK_OVERLAP=int(args.overlap)
     
     # setup storage context 
     if args.vector_type == "local": 
@@ -118,7 +123,7 @@ async def main():
     
     print("** Configured storage context")
     
-    service_context = ServiceContext.from_defaults(chunk_size=2000, chunk_overlap=500,embed_model=args.model, llm='local')
+    service_context = ServiceContext.from_defaults(chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP,embed_model=args.model, llm='local')
     print("** Configured service_context")
     
     documents = SimpleDirectoryReader(input_files=load_docs(args.folder)).load_data()

@@ -58,12 +58,22 @@ spec:
       type: string
       description: collection name in vector DB
 
+    - name: chunk-size
+      type: string
+      default: "1000"
+      description: chunk size for embedding
+
+    - name: chunk-overlap
+      type: string
+      default: "100"
+      description: chunk overlap for embedding
+
   results:
     - name: status
       description: task status 
   steps:
     - name: embedded
-      image: "quay.io/ecosystem-appeng/rag-embedding:26" # update image accordingly
+      image: "quay.io/ecosystem-appeng/rag-embedding:37" # update image accordingly
       envFrom:
           - secretRef:
               name: secret-openai
@@ -90,6 +100,13 @@ spec:
         value: $(params.question-folder)
       - name: TOKENIZERS_PARALLELISM
         value: "false"
+
+      - name: CHUNK_SIZE
+        value: $(params.chunk-size)
+
+      - name: CHUNK_OVERLAP
+        value: $(params.chunk-overlap)
+
       script: |
         #!/usr/bin/env sh
         set -eu
@@ -99,7 +116,7 @@ spec:
                             --auth ${HEADERS} \
                             --model ${MODEL_NAME} \
                             --folder ${FOLDER} \
-                            --collection-name ${COLLECTION_NAME} -o ${WORKSPACE_OUTPUT_PATH} -e ${INCLUDE_EVALUATION} --question-folder ${QUESTION_FOLDER}
+                            --collection-name ${COLLECTION_NAME} -o ${WORKSPACE_OUTPUT_PATH} -e ${INCLUDE_EVALUATION} --question-folder ${QUESTION_FOLDER} -c ${CHUNK_SIZE} -l ${CHUNK_OVERLAP}
 
         mv ${WORKSPACE_OUTPUT_PATH}/metadata.md $(workspaces.output.path)
         cd $(workspaces.output.path)/data && zip -r $(params.output-folder).zip $(params.output-folder)

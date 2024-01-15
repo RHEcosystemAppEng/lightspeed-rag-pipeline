@@ -49,7 +49,7 @@ spec:
         # Appending command to upload multiple release assets.
 
         UPLOAD_ASSET=$(workspaces.output.path)/data/*.zip
-        METADATA_ASSETS=$(workspaces.output.path)/data/*.md
+        METADATA_ASSETS=$(workspaces.output.path)/*.md
         cmd=""
         for file in $UPLOAD_ASSET
         do

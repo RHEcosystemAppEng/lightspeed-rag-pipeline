@@ -51,16 +51,21 @@ async def main():
                                                                     - ibm/granite-13b-chat-v1, ibm/granite-13b-chat-v2, ibm/granite-20b-code-instruct-v1 for bam \
                                                                     - gpt-3.5-turbo-1106, gpt-3.5-turbo for openai"
                         )
-    parser.add_argument("-pi", "--product-index" ,default="product" , help="storage product index")
+    
+    parser.add_argument("-x", "--product-index" ,default="product" , help="storage product index")
     parser.add_argument("-i", "--input-persist-dir" , help="path to persist file dir")
     
     
     parser.add_argument("-q", "--question-folder",   default="", help="docs folder for questions gen")
-    parser.add_argument("-nq", "--number-of-questions" , default="5" , help="number of questions used for evaluation")
+    parser.add_argument("-n", "--number-of-questions" , default="5" , help="number of questions used for evaluation")
     parser.add_argument("-s", "--similarity" , default="5" , help="similarity_top_k")
 
+    parser.add_argument("-c", "--chunk",   default="1000", help="chunk size for embedding")
+    parser.add_argument("-l", "--overlap",   default="100", help="chunk overlap for embedding")
+
+    
     parser.add_argument("-o", "--output", help="persist folder")
-    parser.add_argument("-n", "--collection-name" , help="Collection name in vector DB")
+    # parser.add_argument("-n", "--collection-name" , help="Collection name in vector DB")
 
     # execute 
     args = parser.parse_args() 
@@ -70,6 +75,8 @@ async def main():
     PRODUCT_DOCS_PERSIST_DIR = args.input_persist_dir
     NUM_OF_QUESTIONS=int(args.number_of_questions)
     SIMILARITY=int(args.similarity)
+    CHUNK_SIZE=int(args.chunk)
+    CHUNK_OVERLAP=int(args.overlap)
     
     print("** settings params")
         
@@ -77,7 +84,7 @@ async def main():
     bare_llm = LLMLoader(args.provider, args.model).llm
     
     service_context = ServiceContext.from_defaults(
-            chunk_size=1024, llm=bare_llm, embed_model=embed_model
+            chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP, llm=bare_llm, embed_model=embed_model
         )
     
     print("** settings context")
