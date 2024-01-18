@@ -3,7 +3,7 @@ llama_index
 transformers
 torch
 llama_index
-pysqlite3-binary 
+pysqlite3 
 llama-cpp-python 
 spacy
 nest-asyncio

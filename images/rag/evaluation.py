@@ -21,6 +21,48 @@ from llms.llm_loader import LLMLoader
 # Constant
 
 
+def eval_parser(eval_response: str) :
+    """
+    Default parser function for evaluation response.
+
+    Args:
+        eval_response (str): The response string from the evaluation.
+
+    Returns:
+        Tuple[float, str]: A tuple containing the score as a float and the reasoning as a string.
+    """
+    
+    print("eval_response:", eval_response)
+    
+    eval_response_parsed = eval_response.split("\n")
+    eval_len =len (eval_response_parsed)
+    
+    if eval_len == 0 :
+        return 0, eval_response_parsed
+    if eval_len == 1 :
+        return 0, eval_response_parsed 
+    if eval_len == 2 : 
+        score_str =  eval_response_parsed[0]
+        score = float(score_str) if score_str else 0 
+        reasoning = eval_response_parsed[1]
+        return score, reasoning
+        
+    if eval_len == 3 : 
+        score_str, reasoning_str =  eval_response_parsed[1], eval_response_parsed[2]    
+        score = float(score_str) if score_str else 0 
+        reasoning = reasoning_str.lstrip("\n")
+        return score, reasoning
+    if eval_len > 3 : 
+        return 0, eval_response
+
+    
+
+        # score_str, reasoning_str = eval_response.split("\n", 1)
+        # score = float(score_str) if score_str else 0 
+        # reasoning = reasoning_str.lstrip("\n")
+        # 
+
+
 def get_eval_results(key, eval_results):
     results = eval_results[key]
     correct = 0
@@ -108,18 +150,22 @@ async def main():
     question = reader.load_data()
     data_generator = DatasetGenerator.from_documents(question)
     eval_questions = data_generator.generate_questions_from_nodes(num=NUM_OF_QUESTIONS)
-    # engine = index.as_query_engine(similarity_top_k=1, service_context=service_context)
     
     print( eval_questions)
     
     print("*** start evaluation")
     faithfulness = FaithfulnessEvaluator(service_context=service_context)
     relevancy = RelevancyEvaluator(service_context=service_context)
-    # correctness = CorrectnessEvaluator(service_context=service_context)
+    correctness = CorrectnessEvaluator(service_context=service_context,score_threshold=2.0 ,parser_function=eval_parser
+                                      )
+    
+    
+
 
     runner = BatchEvalRunner(
-        {"faithfulness": faithfulness, "relevancy": relevancy #, "correctness": correctness
-         },
+    { "faithfulness": faithfulness, "relevancy": relevancy ,
+        
+    },
         workers=100, show_progress=True
     )
     
@@ -130,7 +176,42 @@ async def main():
     evaluation_results = {}
     evaluation_results["faithfulness"] = get_eval_results("faithfulness", eval_results)
     evaluation_results["relevancy"] = get_eval_results("relevancy", eval_results)
-    # evaluation_results["correctness"] = get_eval_results("correctness", eval_results)
+    
+    # correcntess
+    
+    engine = index.as_query_engine(similarity_top_k=SIMILARITY, service_context=service_context)
+    
+    res_table = []
+    for query in eval_questions: 
+        
+        res_row ={}
+                
+        summary = engine.query(query)
+        referenced_documents = "\n".join(
+            [
+                source_node.node.metadata["file_name"]
+                for source_node in summary.source_nodes
+            ]
+        )
+        
+        result =correctness.evaluate(
+            query=query,
+            response=summary.response,
+            reference=summary.source_nodes[0].text,
+            )
+        
+        res_row["question"] = query
+        res_row["response"] = summary.response
+        res_row["ref"] = referenced_documents 
+        res_row["ref_doc"] = summary.source_nodes[0].text
+        res_row["ref_doc_score"] = summary.source_nodes[0].score
+        res_row["passing"] = result.passing
+        res_row["feedback"] = result.feedback
+        res_row["score"] = result.score
+        
+        res_table.append(res_row)
+
+    evaluation_results["correctness"] = res_table
 
     end_time = time.time()
     execution_time_seconds = end_time - start_time

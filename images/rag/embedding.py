@@ -4,25 +4,15 @@ import json
 import sys
 import os
 import time
-from backoff import constant 
 sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 
 from llama_index import VectorStoreIndex, SimpleDirectoryReader, ServiceContext
 from llama_index.vector_stores import ChromaVectorStore
 from llama_index.storage.storage_context import StorageContext
-from llama_index.evaluation import (
-    FaithfulnessEvaluator,
-    RelevancyEvaluator,
-    CorrectnessEvaluator,
-    BatchEvalRunner,
-    DatasetGenerator,
-    RelevancyEvaluator
-)
 
 import argparse
 import chromadb
 import asyncio
-import nest_asyncio
 
 # Constant
 PRODUCT_INDEX = "product"
@@ -30,7 +20,7 @@ PRODUCT_INDEX = "product"
 def load_docs(folder): 
     # get files 
     file_paths = []
-    for folder_name, subfolders, files in os.walk(folder):
+    for folder_name, _, files in os.walk(folder):
         for file in files:
             # Create the full path by joining folder path, folder name, and file name
             file_path = os.path.join(folder_name, file)
@@ -48,13 +38,6 @@ def get_eval_results(key, eval_results):
     print(f"{key} Score: {score}")
     return score
 
-
-#         python embedding.py --vector-type ${VECTOR_DB_TYPE} \
-                            # --url ${HOST} --port ${PORT} \
-                            # --auth ${HEADERS} \
-                            # --model ${MODEL_NAME} \
-                            # --folder ${FOLDER} \
-                            # --collection-name ${COLLECTION_NAME} -o ${WORKSPACE_OUTPUT_PATH} -e ${INCLUDE_EVALUATION} --question-folder ${QUESTION_FOLDER}
 
 async def main(): 
     

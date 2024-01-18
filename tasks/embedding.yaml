@@ -73,7 +73,7 @@ spec:
       description: task status 
   steps:
     - name: embedded
-      image: "quay.io/ilan_pinto/rag-embedding:37"
+      image: "quay.io/ecosystem-appeng/rag-embedding:37"
       envFrom:
           - secretRef:
               name: secret-openai

@@ -33,16 +33,16 @@ spec:
 
       - name: chunk-overlap
         type: string
-        default: "50"
+        default: "20"
         description: chunk overlap for embedding
 
       - name: similarity
         type: string
-        default: "2"
+        default: "1"
 
       - name: number-of-questions
         type: string
-        default: "5"
+        default: "10"
         description: number of questions genarated for evaluation 
 
 
