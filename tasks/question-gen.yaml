@@ -1,7 +1,7 @@
 apiVersion: tekton.dev/v1beta1
 kind: Task
 metadata:
-  name: evaluation
+  name: question-gen
 spec:
   description: >-
     These task evaluate embedding file on for different llms  
@@ -34,9 +34,9 @@ spec:
       description: path to persist file folder 
       default: "."
 
-    - name: question-folder
+    - name: question-main-folder
       type: string
-      description: plain text folder path used for question 
+      description: plain text main folder path used for question generation 
 
 
     - name: number-of-questions
@@ -46,23 +46,23 @@ spec:
 
     - name: similarity
       type: string
-      default: "5"
+      default: "1"
 
     - name: chunk-size
       type: string
-      default: "1000"
+      default: "1024"
       description: chunk size for embedding
 
     - name: chunk-overlap
       type: string
-      default: "100"
+      default: "20"
       description: chunk overlap for embedding
 
   results:
     - name: status
       description: task status 
   steps:
-    - name: evaluation
+    - name: question-gen
       image: "quay.io/redhat_emp1/rag-pipeline-tasks"
       imagePullPolicy: Always
       envFrom:
@@ -81,7 +81,7 @@ spec:
       - name: INPUT_PERSIST_DIR
         value: $(params.input-persist-dir)
       - name: QUESTION_FOLDER
-        value: $(params.question-folder)
+        value: $(params.question-main-folder)
 
       - name: SIMILARITY
         value: $(params.similarity)
@@ -114,7 +114,7 @@ spec:
               -n ${NUMBER_OF_QUESTIONS}
               "
 
-        python evaluation.py -p ${PROVIDER} -i ${INPUT_PERSIST_DIR} -x ${PRODUCT_INDEX} -m ${MODEL} -o ${OUTPUT_PATH} -q ${QUESTION_FOLDER} -s ${SIMILARITY} -n ${NUMBER_OF_QUESTIONS} -c ${CHUNK_SIZE} -l ${CHUNK_OVERLAP}
+        python questions_gen.py -p ${PROVIDER} -i ${INPUT_PERSIST_DIR} -x ${PRODUCT_INDEX} -m ${MODEL} -o ${OUTPUT_PATH} -q ${QUESTION_FOLDER} -s ${SIMILARITY} -n ${NUMBER_OF_QUESTIONS} -c ${CHUNK_SIZE} -l ${CHUNK_OVERLAP}
 
         mv ${OUTPUT_PATH}/*.md $(workspaces.output.path)
 

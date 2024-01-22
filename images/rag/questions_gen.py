@@ -1,6 +1,3 @@
-
-
-
 import argparse
 import asyncio
 import json
@@ -95,45 +92,27 @@ def get_eval_breakdown(key, eval_results):
         res["feedback"] = result.feedback
         response.append(res)
     return response
-    
-    
-
-
-#   python evaluation.py --provider ${PROVIDER} \
-                            # ---input-persist-dir ${input-persist-dir}
-                            # --auth ${HEADERS} \
-                            # --model ${MODEL_NAME} \
-                            # --question-folder ${question-folder} \
-                            # --collection-name ${COLLECTION_NAME} 
-                            # -o ${output} -e ${INCLUDE_EVALUATION} --question-folder ${QUESTION_FOLDER}
-
 
 async def main(): 
     start_time = time.time()
     # collect args 
     parser = argparse.ArgumentParser(
-        description="evaluation cli for task execution"
+        description="question gen cli for task execution"
     )
     parser.add_argument("-p", "--provider",   default="bam", help="LLM provider supported value: bam, openai")
     parser.add_argument("-m", "--model",   default="local:BAAI/bge-base-en", help="the valid models are:\
                                                                     - ibm/granite-13b-chat-v1, ibm/granite-13b-chat-v2, ibm/granite-20b-code-instruct-v1 for bam \
                                                                     - gpt-3.5-turbo-1106, gpt-3.5-turbo for openai"
                         )
-    
     parser.add_argument("-x", "--product-index" ,default="product" , help="storage product index")
     parser.add_argument("-i", "--input-persist-dir" , help="path to persist file dir")
-    
-    
     parser.add_argument("-q", "--question-main-folder",   default="", help="docs folder for questions gen")
     parser.add_argument("-n", "--number-of-questions" , default="5" , help="number of questions per file for evaluation")
     parser.add_argument("-s", "--similarity" , default="5" , help="similarity_top_k")
-
+    parser.add_argument("-e", "--include-evaluation" , default="false" , help="similarity_top_k")
     parser.add_argument("-c", "--chunk",   default="1024", help="chunk size for embedding")
     parser.add_argument("-l", "--overlap",   default="20", help="chunk overlap for embedding")
-
-    
     parser.add_argument("-o", "--output", help="persist folder")
-    # parser.add_argument("-n", "--collection-name" , help="Collection name in vector DB")
 
     # execute 
     args = parser.parse_args() 
@@ -165,21 +144,17 @@ async def main():
         index_id=PRODUCT_INDEX,
         service_context=service_context       
     )
-    
-
     nest_asyncio.apply()
     
     print("*** generating questions ")        
     question_folder = args.folder if args.question_main_folder is None else args.question_main_folder
-    
     dir_list = dirs_all_files(question_folder)
-    
     print("*** starting question iteration ")
     
     full_results = []
+    total_correctness_score = []
     for dir in dir_list:         
         print(f"gen questions for: {dir}") 
-
         results = {}
         reader = SimpleDirectoryReader(dir)
         question = reader.load_data()
@@ -188,91 +163,83 @@ async def main():
         
         results["dir_name"] = dir
         results["questions"] = eval_questions
-    
         print( eval_questions)
-    
-        print("*** start evaluation")
-        faithfulness = FaithfulnessEvaluator(service_context=service_context)
-        relevancy = RelevancyEvaluator(service_context=service_context)
-        correctness = CorrectnessEvaluator(service_context=service_context,score_threshold=2.0 ,parser_function=eval_parser)
-    
-    
 
+        if args.include_evaluation == "true":
+            print("*** start evaluation")
+            faithfulness = FaithfulnessEvaluator(service_context=service_context)
+            relevancy = RelevancyEvaluator(service_context=service_context)
+            correctness = CorrectnessEvaluator(service_context=service_context,score_threshold=2.0 ,parser_function=eval_parser)
 
-        runner = BatchEvalRunner(
-        { "faithfulness": faithfulness, "relevancy": relevancy ,
-            
-        },
-            workers=100, show_progress=True
-        )
-    
-        eval_results = await runner.aevaluate_queries( index.as_query_engine(similarity_top_k=SIMILARITY, \
-                                                                            service_context=service_context), \
-                                                                        queries=eval_questions ) 
-    
-         
-        results["faithfulness"] = get_eval_breakdown("faithfulness", eval_results)
-        results["relevancy"] = get_eval_breakdown("relevancy", eval_results) 
+            runner = BatchEvalRunner(
+                                        { "faithfulness": faithfulness, "relevancy": relevancy ,
+                                            
+                                        },
+                                            workers=100, show_progress=True
+                                    )
         
-        end_time = time.time()
-        execution_time_seconds = end_time - start_time    
-        print(f"** completed faithfulness,relevancy evaluation: execution time in min: {execution_time_seconds/60}")
-    
-        # correcntess
-    
-        engine = index.as_query_engine(similarity_top_k=SIMILARITY, service_context=service_context)
+            eval_results = await runner.aevaluate_queries( index.as_query_engine(similarity_top_k=SIMILARITY, \
+                                                                                service_context=service_context), \
+                                                                            queries=eval_questions ) 
         
-        res_table = []
-        for query in eval_questions: 
-            
-            res_row ={}
-                    
-            summary = engine.query(query)
-            referenced_documents = "\n".join(
-                [
-                    source_node.node.metadata["file_name"]
-                    for source_node in summary.source_nodes
-                ]
-            )
-            
-            result =correctness.evaluate(
-                query=query,
-                response=summary.response,
-                reference=summary.source_nodes[0].text,
-                )
-            
-            res_row["query"] = query
-            res_row["response"] = summary.response
-            res_row["ref"] = referenced_documents 
-            res_row["ref_doc"] = summary.source_nodes[0].text
-            res_row["ref_doc_score"] = summary.source_nodes[0].score
-            res_row["passing"] = result.passing
-            res_row["feedback"] = result.feedback
-            res_row["score"] = result.score
-
-            res_table.append(res_row)
-
-            results["correctness"] = res_table
+            results["faithfulness"] = get_eval_breakdown("faithfulness", eval_results)
+            results["relevancy"] = get_eval_breakdown("relevancy", eval_results) 
             
             end_time = time.time()
-            execution_time_seconds = end_time - start_time
-            print(f"*** Completed correctness evaluation: execution time in min: {execution_time_seconds/60}")
-
-            full_results.append(results)
+            execution_time_seconds = end_time - start_time    
+            print(f"** completed faithfulness,relevancy evaluation: execution time in min: {execution_time_seconds/60}")
+        
+            # correctness
+        
+            engine = index.as_query_engine(similarity_top_k=SIMILARITY, service_context=service_context)
+            res_table = []
             
-        # break
-            
+            for query in eval_questions: 
+                res_row ={}
+                summary = engine.query(query)
+                referenced_documents = "\n".join(
+                    [
+                        source_node.node.metadata["file_name"]
+                        for source_node in summary.source_nodes
+                    ]
+                )
+                
+                result =correctness.evaluate(
+                    query=query,
+                    response=summary.response,
+                    reference=summary.source_nodes[0].text,
+                    )
+                
+                res_row["query"] = query
+                res_row["response"] = summary.response
+                res_row["ref"] = referenced_documents 
+                res_row["ref_doc"] = summary.source_nodes[0].text
+                res_row["ref_doc_score"] = summary.source_nodes[0].score
+                res_row["passing"] = result.passing
+                res_row["feedback"] = result.feedback
+                res_row["score"] = result.score
+                total_correctness_score.append(float(result.score))
+                res_table.append(res_row)
+                results["correctness"] = res_table
+                
+                end_time = time.time()
+                execution_time_seconds = end_time - start_time
+                print(f"*** Completed correctness evaluation: execution time in min: {execution_time_seconds/60}")
+                full_results.append(results)
+        else: 
+            full_results.append(results)    
     end_time = time.time()
     execution_time_seconds = end_time - start_time
     print(f"** Total execution time in min: {execution_time_seconds/60}")
     
     # creating metadata folder 
     metadata = {} 
-    
     metadata["execution-time-MIN"] = execution_time_seconds
     metadata["llm"] = args.provider
     metadata["model"] = args.model 
     metadata["index-id"] = PRODUCT_INDEX
+    if args.include_evaluation == "true":
+        metadata["correctness-results"] = sum(total_correctness_score) / len(total_correctness_score)         
     metadata["evaluation-results"] = full_results
     json_metadata = json.dumps(metadata)
     
@@ -285,9 +252,9 @@ async def main():
     file_path = f"{PERSIST_FOLDER}/{args.provider}-{model_name_formatted}_metadata.json"
     with open(file_path, 'w') as file:
         file.write(json_metadata)
-        
     
-    full_results_markdown_content = "\n***\n"
+    #TODO-rewtite this 
+    full_results_markdown_content = "    \n"
     for res in full_results: 
         for key, value in res.items():
             if isinstance(value, list) and type(value[0]) == dict :
@@ -296,8 +263,8 @@ async def main():
                     for k,v in d.items():
                         new += f"   - {k}: {v}\n"
                 value = new
-            full_results_markdown_content += f"- {key}: {value}\n"
-    full_results_markdown_content += "***"     
+            full_results_markdown_content += f"    - {key}: {value}\n"
+   
     
     metadata["evaluation-results"] = full_results_markdown_content
 

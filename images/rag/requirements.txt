@@ -1,4 +1,3 @@
-chromadb==0.4.4
 llama_index
 transformers
 torch
@@ -8,3 +7,5 @@ llama-cpp-python
 spacy
 nest-asyncio
 langchain
+python-dotenv==1.0.0
+chroma

@@ -11,7 +11,6 @@ from llama_index.vector_stores import ChromaVectorStore
 from llama_index.storage.storage_context import StorageContext
 
 import argparse
-import chromadb
 import asyncio
 
 # Constant
@@ -55,10 +54,8 @@ async def main():
     parser.add_argument("-m", "--model",   default="local:BAAI/bge-base-en", help="LLM model used for embeddings [local,llama2, or any other supported by llama_index]")
     parser.add_argument("-e", "--include-evaluation",   default="True", help="preform evaluation [True/False]")
     parser.add_argument("-q", "--question-folder",   default="", help="docs folder for questions gen")
-
-    parser.add_argument("-c", "--chunk",   default="1000", help="chunk size for embedding")
-    parser.add_argument("-l", "--overlap",   default="100", help="chunk overlap for embedding")
-
+    parser.add_argument("-c", "--chunk",   default="1500", help="chunk size for embedding")
+    parser.add_argument("-l", "--overlap",   default="10", help="chunk overlap for embedding")
     parser.add_argument("-o", "--output", help="persist folder")
 
 
@@ -81,7 +78,7 @@ async def main():
             print(" Missing URL or PORT ")
             return 
         
-        chroma_client = chromadb.HttpClient(host=args.url, port=args.port, headers=json.loads(args.auth) )
+        chroma_client = chroma.HttpClient(host=args.url, port=args.port, headers=json.loads(args.auth) )
         collection = chroma_client.create_collection(
             name=args.collection_name,
             get_or_create = True            

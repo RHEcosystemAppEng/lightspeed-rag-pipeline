@@ -20,17 +20,18 @@ This repo contains Tekton pipeline for creation of  LLM embedding using Llama_in
   
 ## Usage
 
-- Build the embedding container under `images/rag` using the build.
-- After building image. make sure to update image name `tasks/embedding.yaml` line 66  
+- Build the embedding container under `images/rag` using the `build.sh` file.
 - Add secrets resources to the secret folder and to link the secretes to the pipeline service account 
-- Edit the pipeline configuration `pipeline/data-pipeline.yaml`
+- Copy and edit the pipeline configuration file `pipeline/data-pipeline.yaml` 
+- add you file adn resources to th `kustomization.yaml` file 
 - Deploy the pipeline pipeline using the following command: 
 ```
 oc apply -k . 
 ``` 
-- Results: 
-    - Image container with the embedding json files under `home/lightspeed/embedding/data` 
-    - GitHub Release is created which includes embedding files and metadata files with stats  
+- Run the pipeline 
+- Results:
+    - Container image in the specified location with the embedding json files  
+    - GitHub Release zip file which contains the embedding files and metadata files
 
 
 ## Folders 
