@@ -11,7 +11,6 @@ from llama_index.vector_stores import ChromaVectorStore
 from llama_index.storage.storage_context import StorageContext
 
 import argparse
-import chromadb
 import asyncio
 
 # Constant

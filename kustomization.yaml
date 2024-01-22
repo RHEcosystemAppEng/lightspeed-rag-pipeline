@@ -25,6 +25,7 @@ resources:
 - tasks/create-github-release.yaml
 - tasks/generate-build-id.yaml
 - tasks/buildah.yaml
+- tasks/question-gen.yaml
 
 # config
 - config/pipeline-config.yaml
@@ -32,4 +33,5 @@ resources:
 # pipeline 
 - pipeline/data-pipeline.yaml
 - pipeline/data-pipeline-v2.yaml
+- pipeline/question-gen-pipeline.yaml
 
