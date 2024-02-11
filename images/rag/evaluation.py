@@ -3,6 +3,7 @@ import asyncio
 import json
 import os
 import time
+from urllib import response
 import nest_asyncio
 from llama_index.evaluation import (
     FaithfulnessEvaluator,
@@ -87,7 +88,8 @@ async def main():
     parser.add_argument("-n", "--number-of-questions" , default="5" , help="number of questions used for evaluation")
     parser.add_argument("-s", "--similarity" , default="5" , help="similarity_top_k")
     parser.add_argument("-c", "--chunk",   default="500", help="chunk size for embedding")
-    parser.add_argument("-l", "--overlap",   default="100", help="chunk overlap for embedding")
+    parser.add_argument("-l", "--overlap",   default="50", help="chunk overlap for embedding")
+    parser.add_argument("-qq", "--load-questions",   default="", help="load questions for evaluation")
     parser.add_argument("-o", "--output", help="persist folder")
 
     # execute 
@@ -123,19 +125,33 @@ async def main():
     
     print("** starting model evaluating")
     nest_asyncio.apply()
+    eval_questions = []
+    if len(args.question_folder) > 1: 
+        print("*** generating questions ")        
+        question_folder = args.folder if args.question_folder is None else args.question_folder
+        reader = SimpleDirectoryReader(question_folder)
+        question = reader.load_data()
+        data_generator = DatasetGenerator.from_documents(question)
+        eval_questions = data_generator.generate_questions_from_nodes(num=NUM_OF_QUESTIONS)
+        print( eval_questions)
     
-    print("*** generating questions ")        
-    question_folder = args.folder if args.question_folder is None else args.question_folder
-    reader = SimpleDirectoryReader(question_folder)
-    question = reader.load_data()
-    data_generator = DatasetGenerator.from_documents(question)
-    eval_questions = data_generator.generate_questions_from_nodes(num=NUM_OF_QUESTIONS)
-    print( eval_questions)
+    if len(args.load_questions) > 1: 
+        print("*** evaluation questions load" )  
+        
+        
+        with open(args.load_questions, 'r') as file:
+            question_file_text = os.path.splitext(args.load_questions)[1] 
+            if question_file_text == ".json":
+                data = json.load(file)
+                for dir in data["evaluation-results"]: 
+                    eval_questions += dir["questions"]
     
     print("*** start evaluation")
     faithfulness = FaithfulnessEvaluator(service_context=service_context)
     relevancy = RelevancyEvaluator(service_context=service_context)
     correctness = CorrectnessEvaluator(service_context=service_context,score_threshold=2.0 ,parser_function=eval_parser)
+    
+
 
     runner = BatchEvalRunner(
                                 { "faithfulness": faithfulness, "relevancy": relevancy 
@@ -152,14 +168,23 @@ async def main():
     evaluation_results["faithfulness"] = get_eval_results("faithfulness", eval_results)
     evaluation_results["relevancy"] = get_eval_results("relevancy", eval_results)
     
-    # correctness test
+   
     engine = index.as_query_engine(similarity_top_k=SIMILARITY, service_context=service_context)
     
-    total_correctness_score = []
+
+    
+    # correctness test and response time 
+    total_correctness_score = 0
+    total_response_time = 0
     res_table = []
-    for query in eval_questions: 
-        res_row ={}                
+    question_pool = eval_questions[:int(args.number_of_questions)]
+    for query in question_pool: 
+        res_row ={} 
+        
+        start_time = time.time()               
         summary = engine.query(query)
+        elapsed_time = time.time() - start_time
+        
         referenced_documents = "\n".join(
             [
                 source_node.node.metadata["file_name"]
@@ -181,7 +206,8 @@ async def main():
         res_row["passing"] = result.passing
         res_row["feedback"] = result.feedback
         res_row["score"] = result.score
-        total_correctness_score.append(float(result.score))
+        total_correctness_score += float(result.score)
+        total_response_time += elapsed_time
         
         res_table.append(res_row)
 
@@ -192,13 +218,16 @@ async def main():
     print(f"** Total execution time in seconds: {execution_time_seconds}")
     
     # creating metadata folder 
+    num_questions = len(question_pool)
     metadata = {} 
     metadata["execution-time"] = execution_time_seconds
     metadata["llm"] = args.provider
     metadata["model"] = args.model 
     metadata["index_id"] = PRODUCT_INDEX
-    metadata["eval_questions"] = eval_questions
-    metadata["correctness-results"] = sum(total_correctness_score) / len(total_correctness_score)
+    metadata["num_of_evaluation_questions"] = num_questions
+    metadata["correctness-results"] = total_correctness_score/ num_questions
+    metadata["average_response_time"] =  total_response_time / num_questions
+    metadata["eval_questions"] = question_pool   
     metadata["evaluation_results"] = evaluation_results
     json_metadata = json.dumps(metadata)
     
