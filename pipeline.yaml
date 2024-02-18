@@ -1,0 +1,44 @@
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  name: script-python-op
+  annotations:
+    tekton.dev/output_artifacts: '{}'
+    tekton.dev/input_artifacts: '{}'
+    tekton.dev/artifact_bucket: mlpipeline
+    tekton.dev/artifact_endpoint: minio-service.kubeflow:9000
+    tekton.dev/artifact_endpoint_scheme: http://
+    tekton.dev/artifact_items: '{"evaluation": []}'
+    sidecar.istio.io/inject: "false"
+    tekton.dev/template: ''
+    pipelines.kubeflow.org/big_data_passing_format: $(workspaces.$TASK_NAME.path)/artifacts/$ORIG_PR_NAME/$TASKRUN_NAME/$TASK_PARAM_NAME
+    pipelines.kubeflow.org/pipeline_spec: '{"name": "script_python_op"}'
+  labels:
+    pipelines.kubeflow.org/pipelinename: ''
+    pipelines.kubeflow.org/generation: ''
+spec:
+  pipelineSpec:
+    tasks:
+    - name: evaluation
+      taskSpec:
+        steps:
+        - name: main
+          args:
+          - --provider
+          - bam
+          - --input-persist-dir
+          - /Users/ilanpinto/dev/ai/rag-pipeline/persist-dir
+          - --model
+          - ibm/granite-13b-chat-v2
+          - -s
+          - '2'
+          - -n
+          - '5'
+
+          command:
+          - python
+          - evaluation.py
+          image: quay.io/redhat_emp1/rag-pipeline-tasks
+        metadata:
+          labels:
+            pipelines.kubeflow.org/cache_enabled: "true"
