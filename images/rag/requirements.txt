@@ -1,11 +1,11 @@
-llama_index
+llama_index==0.9.39
 transformers
 torch
-llama_index
-pysqlite3 
-llama-cpp-python 
+pysqlite3
+llama-cpp-python
 spacy
 nest-asyncio
 langchain
 python-dotenv==1.0.0
-chroma
+chromadb
+faiss-cpu
