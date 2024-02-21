@@ -9,6 +9,9 @@ sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 from llama_index import VectorStoreIndex, SimpleDirectoryReader, ServiceContext
 from llama_index.vector_stores import ChromaVectorStore
 from llama_index.storage.storage_context import StorageContext
+from llama_index.vector_stores.faiss import FaissVectorStore
+import faiss
+import chromadb
 
 import argparse
 import asyncio
@@ -16,8 +19,8 @@ import asyncio
 # Constant
 PRODUCT_INDEX = "product"
 
-def load_docs(folder): 
-    # get files 
+def load_docs(folder):
+    # get files
     file_paths = []
     for folder_name, _, files in os.walk(folder):
         for file in files:
@@ -25,7 +28,7 @@ def load_docs(folder):
             file_path = os.path.join(folder_name, file)
             file_paths.append(file_path)
     print(f"** Found {len(file_paths)} files ")
-    return file_paths   
+    return file_paths
 
 def get_eval_results(key, eval_results):
     results = eval_results[key]
@@ -38,73 +41,70 @@ def get_eval_results(key, eval_results):
     return score
 
 
-async def main(): 
-    
+async def main():
+
     start_time = time.time()
-    # collect args 
+    # collect args
     parser = argparse.ArgumentParser(
         description="embedding cli for task execution"
     )
-    parser.add_argument("-t", "--vector-type",   default="local", help="Type of vector db[local,chromadb,chromadb-local, milvus]")
-    parser.add_argument("-u", "--url", help="VectorDB URL")    
-    parser.add_argument("-p", "--port", help="VectorDB port")    
-    parser.add_argument("-a", "--auth", help="Authentication headers per vectorDB requirements")    
+    parser.add_argument("-t", "--vector-type",   default="local", help="Type of vector db [local,chromadb,chromadb-local,faiss]")
+    parser.add_argument("-u", "--url", help="Vector DB URL")
+    parser.add_argument("-p", "--port", help="Vector DB port")
+    parser.add_argument("-a", "--auth", help="Authentication headers per vector DB requirements")
     parser.add_argument("-n", "--collection-name", help="Collection name in vector DB")
     parser.add_argument("-f", "--folder", help="Plain text folder path")
-    parser.add_argument("-m", "--model",   default="local:BAAI/bge-base-en", help="LLM model used for embeddings [local,llama2, or any other supported by llama_index]")
-    parser.add_argument("-e", "--include-evaluation",   default="True", help="preform evaluation [True/False]")
-    parser.add_argument("-q", "--question-folder",   default="", help="docs folder for questions gen")
-    parser.add_argument("-c", "--chunk",   default="1500", help="chunk size for embedding")
-    parser.add_argument("-l", "--overlap",   default="10", help="chunk overlap for embedding")
-    parser.add_argument("-o", "--output", help="persist folder")
+    parser.add_argument("-m", "--model",   default="local:BAAI/bge-base-en", help="LLM model used for embeddings [local, llama2, or any other supported by llama_index]")
+    parser.add_argument("-e", "--include-evaluation",   default="True", help="Perform evaluation [True/False]")
+    parser.add_argument("-q", "--question-folder",   default="", help="Docs folder for questions gen")
+    parser.add_argument("-c", "--chunk",   default="1500", help="Chunk size for embedding")
+    parser.add_argument("-l", "--overlap",   default="10", help="Chunk overlap for embedding")
+    parser.add_argument("-o", "--output", help="Vector DB output folder")
 
 
-    # execute 
-    args = parser.parse_args() 
-    
+    # execute
+    args = parser.parse_args()
+
     PERSIST_FOLDER = args.output
     CHUNK_SIZE=int(args.chunk)
     CHUNK_OVERLAP=int(args.overlap)
-    
-    # setup storage context 
-    if args.vector_type == "local": 
-        print("** Local embeddings ") 
-        storage_context = StorageContext.from_defaults()
-        
-    elif args.vector_type == "chromadb":
-        print("** chromadb embeddings ")
-        #Validate Inputs 
-        if args.url is None or args.port is None: 
-            print(" Missing URL or PORT ")
-            return 
-        
-        chroma_client = chroma.HttpClient(host=args.url, port=args.port, headers=json.loads(args.auth) )
-        collection = chroma_client.create_collection(
-            name=args.collection_name,
-            get_or_create = True            
+
+    # setup storage context
+    match args.vector_type:
+        case "local":
+            print("** Local embeddings")
+            storage_context = StorageContext.from_defaults()
+        case "chromadb":
+            print("** chromadb embeddings")
+            #Validate Inputs
+            if args.url is None or args.port is None:
+                print("Missing URL or PORT")
+                return
+            chroma_client = chromadb.HttpClient(host=args.url, port=args.port, headers=json.loads(args.auth))
+            collection = chroma_client.create_collection(
+                name=args.collection_name,
+                get_or_create = True
+                )
+            vector_store = ChromaVectorStore(chroma_collection=collection)
+            storage_context = StorageContext.from_defaults(vector_store=vector_store)
+        case "chromadb-local":
+            chroma_client = chromadb.Client()
+            collection = chroma_client.create_collection(
+                name=args.collection_name,
+                get_or_create = True
             )
-        vector_store = ChromaVectorStore(chroma_collection=collection)
-        storage_context = StorageContext.from_defaults(vector_store=vector_store)
-        
-        
-    elif args.vector_type == "chromadb-local":
-        chroma_client = chromadb.Client()
-        collection = chroma_client.create_collection(
-            name=args.collection_name,
-            get_or_create = True            
-            )
-        vector_store = ChromaVectorStore(chroma_collection=collection)
-        storage_context = StorageContext.from_defaults(vector_store=vector_store )
-    
-        
-    elif args.vector_type == "milvus":
-        return 
-    
+            vector_store = ChromaVectorStore(chroma_collection=collection)
+            storage_context = StorageContext.from_defaults(vector_store=vector_store )
+        case "faiss":
+            faiss_index = faiss.IndexFlatL2(768)
+            vector_store = FaissVectorStore(faiss_index=faiss_index)
+            storage_context = StorageContext.from_defaults(vector_store=vector_store)
+
     print("** Configured storage context")
-    
-    service_context = ServiceContext.from_defaults(chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP,embed_model=args.model, llm='local')
+
+    service_context = ServiceContext.from_defaults(chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP,embed_model=args.model, llm=None)
     print("** Configured service_context")
-    
+
     documents = SimpleDirectoryReader(input_files=load_docs(args.folder)).load_data()
     print("** Loading docs ")
 
@@ -117,15 +117,15 @@ async def main():
 
     end_time = time.time()
     execution_time_seconds = end_time - start_time
-    
+
     print(f"** Total execution time in seconds: {execution_time_seconds}")
-    
-    # creating metadata folder 
-    metadata = {} 
-    
+
+    # creating metadata folder
+    metadata = {}
+
     metadata["execution-time"] = execution_time_seconds
     metadata["llm"] = 'local'
-    metadata["embedding-model"] = args.model 
+    metadata["embedding-model"] = args.model
     metadata["index_id"] = PRODUCT_INDEX
 
     metadata["vector-db"] = args.vector_type
@@ -137,18 +137,18 @@ async def main():
     file_path = f"{PERSIST_FOLDER}/metadata.json"
     with open(file_path, 'w') as file:
         file.write(json_metadata)
-    
-    # Convert JSON data to markdown 
+
+    # Convert JSON data to markdown
     markdown_content = "```markdown\n"
     for key, value in metadata.items():
         markdown_content += f"- {key}: {value}\n"
-    markdown_content += "```" 
-    
+    markdown_content += "```"
+
     file_path = f"{PERSIST_FOLDER}/metadata.md"
     with open(file_path, 'w') as file:
         file.write(markdown_content)
 
 
     return "Completed"
-    
+
 asyncio.run(main())
