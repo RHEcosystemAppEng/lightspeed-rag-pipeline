@@ -16,6 +16,10 @@ spec:
       type: string
       description: plain text folder path
 
+    - name: input_folders
+      description: List of folders for processing.
+      type: array
+
     - name: vector-db
       type: string
       description: type of vector db[local,chromadb,chromadb-local, milvus]
@@ -60,18 +64,35 @@ spec:
 
     - name: chunk-size
       type: string
-      default: "1000"
+      default: "500"
       description: chunk size for embedding
 
     - name: chunk-overlap
       type: string
-      default: "100"
+      default: "50"
       description: chunk overlap for embedding
 
   results:
     - name: status
       description: task status 
+    - name: folders
+      description: folders list convert to string 
   steps:
+    - name: convert-to-string
+      image: registry.access.redhat.com/ubi9/ubi-minimal:9.3-1552
+      args:
+        - $(params.input_folders[*])
+      script: |
+        #!/bin/bash
+        for folder in $@
+        do
+          folders_string+="$folder "
+        done
+
+        echo "FOLDERS='${folders_string}'" > /tekton/results/folders 
+        cat /tekton/results/folders 
+
+
     - name: embedded
       image: "quay.io/redhat_emp1/rag-pipeline-tasks"
       imagePullPolicy: Always
@@ -95,29 +116,27 @@ spec:
         value: $(params.collection-name)
       - name: WORKSPACE_OUTPUT_PATH
         value: $(workspaces.output.path)/data/$(params.output-folder)
-      - name: INCLUDE_EVALUATION
-        value: $(params.include-evaluation)
+
       - name: QUESTION_FOLDER
         value: $(params.question-folder)
       - name: TOKENIZERS_PARALLELISM
         value: "false"
-
       - name: CHUNK_SIZE
         value: $(params.chunk-size)
-
       - name: CHUNK_OVERLAP
         value: $(params.chunk-overlap)
-
       script: |
         #!/usr/bin/env sh
         set -eu
+
+        source /tekton/results/folders
 
         python embedding.py --vector-type ${VECTOR_DB_TYPE} \
                             --url ${HOST} --port ${PORT} \
                             --auth ${HEADERS} \
                             --model ${MODEL_NAME} \
-                            --folder ${FOLDER} \
-                            --collection-name ${COLLECTION_NAME} -o ${WORKSPACE_OUTPUT_PATH} -e ${INCLUDE_EVALUATION} --question-folder ${QUESTION_FOLDER} -c ${CHUNK_SIZE} -l ${CHUNK_OVERLAP}
+                            --folders "${FOLDERS} " \
+                            --collection-name ${COLLECTION_NAME} -o ${WORKSPACE_OUTPUT_PATH} --question-folder ${QUESTION_FOLDER} -c ${CHUNK_SIZE} -l ${CHUNK_OVERLAP}
 
         mv ${WORKSPACE_OUTPUT_PATH}/metadata.md $(workspaces.output.path)
         cd $(workspaces.output.path)/data && zip -r $(params.output-folder).zip $(params.output-folder)
