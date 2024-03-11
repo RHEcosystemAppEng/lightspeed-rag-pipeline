@@ -34,4 +34,4 @@ resources:
 - pipeline/data-pipeline.yaml
 - pipeline/data-pipeline-v2.yaml
 - pipeline/question-gen-pipeline.yaml
-
+- pipeline/data-pipeline-v4.yaml

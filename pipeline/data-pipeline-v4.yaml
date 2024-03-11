@@ -1,7 +1,7 @@
-apiVersion: tekton.dev/v1beta1
+apiVersion: tekton.dev/v1
 kind: Pipeline
 metadata:
-  name: rag-data-pipeline-v3
+  name: rag-data-pipeline-v4
 spec: 
       params:
       - name: repo
@@ -15,11 +15,27 @@ spec:
       - name: plain-text-folder
         type: string
         description: Plain text folder path
-        default: /workspace/source/ocp-product-docs-plaintext
+        default: ""
+
+      - name: input-folders
+        description: List of folders for processing.
+        type: array
+        default: ["/workspace/source/ocp-product-docs-4_14","/workspace/source/ocp-product-docs-4_15"]
+
+      - name: include-evalution
+        type: string
+        default: "true"
+        description: run auto evaluation 
+
+      - name: relese
+        type: string
+        default: "true"
+        description: release artifact true/false
+
       - name: question-folder
         type: string
         description: Plain text question-folder path
-        default: /workspace/source/ocp-product-docs-plaintext/installing/installing_aws
+        default: /workspace/source/ocp-product-docs-4_14/installing/installing_aws
 
       - name: tag
         type: string
@@ -29,23 +45,21 @@ spec:
       - name: chunk-size
         type: string
         description: chunk size for embedding
-        default: "50"
+        default: "512"
 
       - name: chunk-overlap
         type: string
-        default: "512"
+        default: "50"
         description: chunk overlap for embedding
 
       - name: similarity
         type: string
-        default: "2"
+        default: "1"
 
       - name: number-of-questions
         type: string
         default: "10"
         description: number of questions genarated for evaluation 
-
-
 
       workspaces:     
         - name: shared-workspace  
@@ -82,7 +96,7 @@ spec:
               value: "local"
 
             - name: model-name
-              value: local:BAAI/bge-base-en
+              value: local:sentence-transformers/all-mpnet-base-v2
 
             - name: plain-text-folder
               value: "$(params.plain-text-folder)"
@@ -101,11 +115,17 @@ spec:
 
             - name: chunk-overlap
               value: "$(params.chunk-overlap)" 
-      
-  
+
+            - name: input_folders
+              value: "$(params.input-folders[*])" 
+
       - name: bam-chat-v2-evaluation
         taskRef:
           name: evaluation
+        when:
+          - input: "$(params.include-evalution)"
+            operator: in     
+            values: ["true"]
         runAfter:
           - local-embedding
         workspaces:
@@ -121,6 +141,9 @@ spec:
 
             - name: model
               value: ibm/granite-13b-chat-v2
+
+            - name: product-index
+              value: "ocp-product-docs-4_14"
 
             - name: input-persist-dir
               value: "$(workspaces.output.path)/data/local"
@@ -139,48 +162,14 @@ spec:
 
             - name: number-of-questions
               value: "$(params.number-of-questions)"  
- 
-
-      # - name: bam-granite-20b-code-instruct-v1-evaluation
-      #   taskRef:
-      #     name: evaluation
-      #   runAfter:
-      #     - local-embedding
-      #   workspaces:
-      #     - name: persist-source
-      #       workspace: shared-workspace  
-      #     - name: output
-      #       workspace: shared-workspace 
-      #     - name: source
-      #       workspace: shared-workspace  
-      #   params:
-      #       - name: provider
-      #         value: "bam"
-
-      #       - name: model
-      #         value: ibm/granite-20b-code-instruct-v1
-
-      #       - name: input-persist-dir
-      #         value: "$(workspaces.output.path)/data/local"
-
-      #       - name: question-folder
-      #         value: "$(params.question-folder)" 
-
-      #       - name: chunk-size
-      #         value: "$(params.chunk-size)" 
-
-      #       - name: chunk-overlap
-      #         value: "$(params.chunk-overlap)" 
-
-      #       - name: similarity
-      #         value: "$(params.similarity)"  
-                          
-      #       - name: number-of-questions
-      #         value: "$(params.number-of-questions)"  
 
       - name: openai-gpt-3-5-turbo-evaluation
         taskRef:
           name: evaluation
+        when:
+          - input: "$(params.include-evalution)"
+            operator: in
+            values: ["true"]
         runAfter:
           - local-embedding
         workspaces:
@@ -196,6 +185,9 @@ spec:
 
             - name: model
               value: gpt-3.5-turbo-1106
+
+            - name: product-index
+              value: "ocp-product-docs-4_15"
 
             - name: input-persist-dir
               value: "$(workspaces.output.path)/data/local"
@@ -221,7 +213,7 @@ spec:
         runAfter:
             - bam-chat-v2-evaluation
             - openai-gpt-3-5-turbo-evaluation
-            # - bam-granite-20b-code-instruct-v1-evaluation
+  
         workspaces:
           - name: output
             workspace: shared-workspace 
@@ -231,6 +223,10 @@ spec:
           name: buildah
         runAfter:
           - create-docker-file
+        when:
+          - input: "$(params.relese)"
+            operator: in
+            values: ["true"]
         workspaces:
           - name: output
             workspace: shared-workspace  
@@ -246,7 +242,10 @@ spec:
         runAfter:
             - bam-chat-v2-evaluation
             - openai-gpt-3-5-turbo-evaluation
-            #  - bam-granite-20b-code-instruct-v1-evaluation
+        when:
+          - input: "$(params.relese)"
+            operator: in
+            values: ["true"]
         workspaces:
           - name: source
             workspace: shared-workspace  

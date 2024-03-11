@@ -77,17 +77,17 @@ async def main():
         description="evaluation cli for task execution"
     )
     parser.add_argument("-p", "--provider",   default="bam", help="LLM provider supported value: bam, openai")
-    parser.add_argument("-m", "--model",   default="local:BAAI/bge-base-en", help="the valid models are:\
+    parser.add_argument("-m", "--model",   default="local:sentence-transformers/all-mpnet-base-v2", help="the valid models are:\
                                                                     - ibm/granite-13b-chat-v1, ibm/granite-13b-chat-v2, ibm/granite-20b-code-instruct-v1 for bam \
                                                                     - gpt-3.5-turbo-1106, gpt-3.5-turbo for openai"
                         )    
     parser.add_argument("-x", "--product-index" ,default="product" , help="storage product index")
     parser.add_argument("-i", "--input-persist-dir" , help="path to persist file dir")
     parser.add_argument("-q", "--question-folder",   default="", help="docs folder for questions gen")
-    parser.add_argument("-n", "--number-of-questions" , default="5" , help="number of questions used for evaluation")
-    parser.add_argument("-s", "--similarity" , default="5" , help="similarity_top_k")
-    parser.add_argument("-c", "--chunk",   default="500", help="chunk size for embedding")
-    parser.add_argument("-l", "--overlap",   default="100", help="chunk overlap for embedding")
+    parser.add_argument("-n", "--number-of-questions" ,type=int, default="5" , help="number of questions used for evaluation")
+    parser.add_argument("-s", "--similarity" , type=int,  default="5" , help="similarity_top_k")
+    parser.add_argument("-c", "--chunk", type=int ,  default="500", help="chunk size for embedding")
+    parser.add_argument("-l", "--overlap", type=int,  default="100", help="chunk overlap for embedding")
     parser.add_argument("-o", "--output", help="persist folder")
 
     # execute 
@@ -96,10 +96,10 @@ async def main():
     PERSIST_FOLDER = args.output
     PRODUCT_INDEX=args.product_index
     PRODUCT_DOCS_PERSIST_DIR = args.input_persist_dir
-    NUM_OF_QUESTIONS=int(args.number_of_questions)
-    SIMILARITY=int(args.similarity)
-    CHUNK_SIZE=int(args.chunk)
-    CHUNK_OVERLAP=int(args.overlap)
+    NUM_OF_QUESTIONS=args.number_of_questions
+    SIMILARITY=args.similarity
+    CHUNK_SIZE=args.chunk
+    CHUNK_OVERLAP=args.overlap
     
     print("** settings params")
         

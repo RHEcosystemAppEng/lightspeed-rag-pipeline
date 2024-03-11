@@ -4,3 +4,4 @@
 .env
 /persist-dir
 *.pyc
+.DS_Store
